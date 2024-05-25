@@ -18,20 +18,20 @@ opvragen indien gewenst en/of verplaatsen naar camp. Steeds wordt de totale waar
 gewicht berekend en aangegeven of de speler emcumbered is.
 
 
-
-JSON-files zijn te downloaden via https://www.dnd5eapi.co/api/equipment en afgeleiden.
-Gebruiken van juiste structuren
-De gegevens worden juist bewaard in de juiste members van de structuren
-Gebruik van pointers is steeds van het juiste type
-Pointers worden juist gebruikt bij parameters van functies (o.a. call-by-reference)
-Geheugen wordt juist en efficiënt gealloceerd
-Geen memory leaks, geheugen wordt steeds juist opgeruimd
-Er wordt correct gebruikgemaakt van de arguments to main (input en output files via flags)
-De structuur voor een linked list is juist en efficiënt voorzien
-Functies zijn voorzien om push, pop and cycle te doen op de circulaire linked list
-Bewaren van gemaakte keuzes in bestand m.b.v. file handling 
-Parse de json data van het bestand naar de voorziene gegevensstructuur
-Het geheel maakt gebruik van het ingeladen bestand en speelbaar deel te maken die objecten bijhoudt
-Het geheel werk volledig zonder crashen
-Wekelijkse nuttige commit op GitHub (min. 5)
-getopt() gebruiken
+Points i can deserve: 
+- JSON-files zijn te downloaden via https://www.dnd5eapi.co/api/equipment en afgeleiden.
+- Gebruiken van juiste structuren
+- De gegevens worden juist bewaard in de juiste members van de structuren
+- Gebruik van pointers is steeds van het juiste type
+- Pointers worden juist gebruikt bij parameters van functies (o.a. call-by-reference)
+- Geheugen wordt juist en efficiënt gealloceerd
+- Geen memory leaks, geheugen wordt steeds juist opgeruimd
+- Er wordt correct gebruikgemaakt van de arguments to main (input en output files via flags)
+- De structuur voor een linked list is juist en efficiënt voorzien
+- Functies zijn voorzien om push, pop and cycle te doen op de circulaire linked list
+- Bewaren van gemaakte keuzes in bestand m.b.v. file handling 
+- Parse de json data van het bestand naar de voorziene gegevensstructuur
+- Het geheel maakt gebruik van het ingeladen bestand en speelbaar deel te maken die objecten bijhoudt
+- Het geheel werk volledig zonder crashen
+- Wekelijkse nuttige commit op GitHub (min. 5)
+- getopt() gebruiken
