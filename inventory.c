@@ -5,6 +5,12 @@
 #define MAX_ITEMS 40
 #define MAX_COIN_TYPES 5
 
+double totalWeight = 0;
+
+enum placeItem{
+BAGPACK,
+CAMP
+};
 struct Cost {
     char unit[3];
     int quantity;
@@ -15,13 +21,16 @@ struct Item {
 	int itemCount;
     double weight;
 	struct Cost cost;
+	enum placeItem place;
+	struct Item *prev;
 	struct Item *next;
 };
 
 struct Inventory {
-    struct Item *head;
-	double maxWeight;
+    double maxWeight;
+	char *campFile;
     struct Cost coins[MAX_COIN_TYPES];
+	struct Item *items;
 };
 
 int allocateAndCheck(void **ptr, size_t size, const char *errorMessage);
@@ -29,17 +38,18 @@ int handlingFile(const char *fileName, struct Inventory *inventory, int itemCoun
 char *jsonVal(FILE *filePointer, const char *keyWord);
 char *jsonNum(FILE *filePointer, const char *keyWord);
 void addItem(struct Inventory *inventory, struct Item *newItem);
-void displayInventory(struct Inventory *inventory) ;
+void displayInventory(struct Inventory *inventory , struct Item *current) ;
 void freeInventory(struct Inventory *inventory);
 int isValidCoin(const char* unit);
+void clearScreen();
+void printInterface();
+void interfaceClient(struct Inventory *inventory, struct Item **currentItem) ;
 
 //Inventory.exe -w 180.75 -m 4gp 42sp 69cp greatsword.json explorers-pack.json small-knife.json 2 waterskin.json leather-armor.json -c camp.log
 int main(int argc, char* argv[])
 {
   struct Inventory inventory= {0};
   int i;
-  char campFile[50]= "";
-
   
 	if (argc <= 2) {
 	printf("Usage: %s equipment-files [number-of-items] [-w max-weight] [-m money] [-c camp-file]\n", argv[0]);
@@ -47,14 +57,14 @@ int main(int argc, char* argv[])
 	}
 
 	for(i=1; i< argc; i++)
-	{
+	{ 		
 		if (strcmp(argv[i],"-w") == 0)					//handle max_weight
 		{
 			inventory.maxWeight= atof(argv[++i]);
-			printf("maxweight : %.2f \n", inventory.maxWeight);
+			printf("The player can carry max : %.2f \n", inventory.maxWeight);
 		} else if (strcmp(argv[i],"-m") == 0)			//handle coins
 		{
-			printf("Coins : \n");
+			printf("The player has this many coins in his pocket: ");
 			for( int j =0 ; j< MAX_COIN_TYPES && i+1 <argc; j++)  
 			{	
 			int qty;
@@ -63,23 +73,26 @@ int main(int argc, char* argv[])
 					inventory.coins[j].quantity = qty;
 					strcpy(inventory.coins[j].unit,unit);
 			
-				printf("%d%s\n", inventory.coins[j].quantity, inventory.coins[j].unit);
+				printf("%d%s\t", inventory.coins[j].quantity, inventory.coins[j].unit);
 				i++;
 				} else {
 				break;
 				}
 			}
+			printf("\n"); //add new line after coins. 
 
 			
 		} else if (strcmp(argv[i],"-c") == 0)			//handle camp file
 		{
-			strcpy(campFile,argv[++i]);
-			FILE *campFilePtr = fopen( campFile, "a");		//open campfile for appending
-				if (campFile == NULL){
-				printf("Unable to open file: %s\n", campFile);
+	
+			inventory.campFile=argv[++i];
+
+			FILE *campFilePtr = fopen( inventory.campFile, "a");		//open campfile for appending
+				if (inventory.campFile == NULL){
+				printf("Unable to open file: %s\n", inventory.campFile);
                 continue;
 				}
-				printf("campfile opened and closed\n");
+				printf("campfile %s opened and closed\n",inventory.campFile);
 					fclose(campFilePtr);
 		} else 	{			// handle all other files
 		
@@ -92,7 +105,9 @@ int main(int argc, char* argv[])
 			}           
 		}	
 	}
-	displayInventory(&inventory);
+	
+	
+	displayInventory(&inventory, inventory.items);
 	freeInventory(&inventory);
 	
 	return 0;
@@ -124,7 +139,7 @@ int handlingFile(const char *fileName, struct Inventory *inventory, int itemCoun
         perror("Memory allocation failed");
         return 1;
     }
-	
+	item->place = BAGPACK; //item is standard in the bagpack and can changed later on.
 	item->itemCount = itemCount;  // put aantal in the struct 
 
     // Parse "name"
@@ -132,11 +147,9 @@ int handlingFile(const char *fileName, struct Inventory *inventory, int itemCoun
     if (token == NULL) {
         fprintf(stderr, "Error: Could not find 'name' key in JSON.\n");
         return 1;
-    }
-   
+    }   
     strcpy(item->name, token); // put in the keyword inside of the struct
-   // printf("name = %s\n", item->name);
-	
+ 	
     // Parse "quantity"
     token = jsonNum(filePointer, "quantity");
     if (token == NULL) {
@@ -145,8 +158,6 @@ int handlingFile(const char *fileName, struct Inventory *inventory, int itemCoun
 	}
 	item->cost.quantity = atoi(token);
 	
-   // printf("quantity = %d\n", item->cost.quantity);
-	
     // Parse "unit"
     token = jsonVal(filePointer, "unit");
     if (token == NULL) {
@@ -154,8 +165,7 @@ int handlingFile(const char *fileName, struct Inventory *inventory, int itemCoun
         return 1;
     }
     strcpy(item->cost.unit, token);
-   // printf("unit = %s\n", item->cost.unit);
-
+ 
     // Parse "weight"
     token = jsonNum(filePointer, "weight");
     if (token == NULL) {
@@ -163,10 +173,9 @@ int handlingFile(const char *fileName, struct Inventory *inventory, int itemCoun
         return 1;
     }
     item->weight = atof(token);
-    //printf("weight = %.2f\n", item->weight);
-
+   
 	item->next = NULL;
-
+	item->prev = NULL;
     addItem(inventory, item);
 
     fclose(filePointer);
@@ -204,8 +213,7 @@ char * jsonNum(FILE *filePointer, const char *keyWord) {
     while (fgets(buffer, sizeof(buffer), filePointer) != NULL) {
         token = strtok(buffer, "\"");
         while (token) {
-            token = strtok(NULL, "\"");
-//printf("token = %s\n",token);
+				token = strtok(NULL, "\"");
             if (token != NULL && strcmp(token, keyWord) == 0) {
                 token = strtok(NULL, ":");
                 if (token != NULL) {
@@ -226,37 +234,126 @@ return strcmp(unit, "cp") == 0 || strcmp(unit, "sp") == 0 ||
        strcmp(unit, "pp") == 0;
 }
 
-void displayInventory(struct Inventory *inventory) {
-    struct Item *current = inventory->head;
-    double totalWeight = 0;
+void clearScreen(){
+	system("cls");
+}
+
+void displayInventory(struct Inventory *inventory, struct Item *current) {
+  
+  
     printf("Inventory:\n");
-    while (current != NULL) {
-        printf("Item: %s, Weight: %.2f, Cost: %d %s Quantity : %d\n", current->name, current->weight, current->cost.quantity, current->cost.unit , current->itemCount);
-        totalWeight = (current->weight*current->itemCount) + totalWeight;
-        current = current->next;
+    
+	   if (current == NULL) {
+        printf("Inventory is empty.\n");
+        return;
     }
-    printf("Total Weight: %.2f\n", totalWeight);
-    printf("Encumbered: %s\n", totalWeight > inventory->maxWeight ? "Yes" : "No");
+	struct Item *start = current;
+	do{
+		clearScreen();
+        printf("Item: %s\nWeight: %.2f\nCost: %d %s\nQuantity : %d\nPlace: %s\n",
+		current->name, current->weight, current->cost.quantity, current->cost.unit , current->itemCount, current->place == BAGPACK ? "BAGPACK": "CAMP");
+		if (current->place == BAGPACK){
+		totalWeight = (current->weight*current->itemCount) + totalWeight;		
+		printf("Total Weight in backpack: %.2f\n", totalWeight);
+		printf("Encumbered: %s\n", totalWeight > inventory->maxWeight ? "Yes" : "No");
+		} else {
+			printf("Total Weight in backpack: %.2f\n", totalWeight);
+		printf("Encumbered: %s\n", totalWeight > inventory->maxWeight ? "Yes" : "No");
+		}
+		printInterface();
+		interfaceClient(inventory, &current);
+		
+        totalWeight = (current->weight*current->itemCount) + totalWeight;		
+		printf("Total Weight in backpack: %.2f\n", totalWeight);
+		printf("Encumbered: %s\n", totalWeight > inventory->maxWeight ? "Yes" : "No");
+        current = current->next;		
+    } while (current != start);
+	
+   
 }
 
 void freeInventory(struct Inventory *inventory) {
-    struct Item *current = inventory->head;
-    while (current != NULL) {
-        struct Item *next = current->next;
+      if (inventory->items == NULL) {
+        return;
+    }
+
+    struct Item *current = inventory->items;
+    struct Item *next;
+
+    do {
+        next = current->next;
         free(current);
         current = next;
-    }
-    inventory->head = NULL;
+    } while (current != inventory->items);
+
+    inventory->items = NULL;
+
 }
 
 void addItem(struct Inventory *inventory, struct Item *newItem) {
-    if (inventory->head == NULL) {
-        inventory->head = newItem;
+    if (inventory->items == NULL) {
+        inventory->items = newItem;
+		newItem->next = newItem;
+		newItem->prev = newItem;
     } else {
-        struct Item *current = inventory->head;
-        while (current->next != NULL) {
-            current = current->next;
-        }
-        current->next = newItem;
+        struct Item *last = inventory->items->prev;
+      last->next = newItem;
+	  newItem->prev = last;
+	  newItem->next = inventory->items;
+	  inventory->items->prev = newItem;
     }
+}
+
+
+void printInterface(){
+	
+printf("What do you want to do with this item?\nYou can choose between these options: \n");
+printf("1. Move item from player to camp.\n");
+printf("2. Move item from camp to player.\n");
+printf("3. Go to the next item.\n");
+printf("4. Go to the previous item.\n");
+printf("5. quit the inventory.\n");
+}
+
+void interfaceClient(struct Inventory *inventory, struct Item **currentItem) {
+    int choice;
+    
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+        switch (choice) {
+            case 1:
+                if ((*currentItem)->place == BAGPACK) {
+                    (*currentItem)->place = CAMP;
+                    printf("Item moved to camp.\n");
+					displayInventory(inventory, *currentItem);
+                } else {
+                    printf("Item is already in camp.\n");
+					displayInventory(inventory, *currentItem);
+                }
+                break;
+            case 2:
+                if ((*currentItem)->place == CAMP) {
+                    (*currentItem)->place = BAGPACK;
+                    printf("Item moved to bagpack.\n");
+					displayInventory(inventory, *currentItem);
+                } else {
+                    printf("Item is already in the bagpack.\n");
+					displayInventory(inventory, *currentItem);
+                }
+                break;
+            case 3:
+				*currentItem = (*currentItem)->next;
+				displayInventory(inventory, *currentItem);
+                return; 
+            case 4:
+				*currentItem = (*currentItem)->prev;
+				displayInventory(inventory, *currentItem);
+                return;
+            case 5:
+                exit(0);
+            default:
+                printf("Invalid choice. Please try again.\n");
+        }
+		
+    
 }
